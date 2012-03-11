@@ -4,7 +4,7 @@ var fs = require('fs');
 var querystring = require('querystring');
 var sys = require('sys');
 
-Array.prototype.removeElement = function(element) {
+Array.prototype.remove = function(element) {
 	for(var i = 0; i < this.length; i++) {
 		if (this[i] === element) {
 			this.splice(i,1);
@@ -19,7 +19,7 @@ http.createServer(function (request, response) {
 	
 	request.setEncoding('utf8');
 	response.writeHead(200, {'Content-Type': 'text/plain'});
-	  	
+
 	request.on('data', function(chunk) {
 		body += chunk.toString();
 	})
@@ -50,7 +50,7 @@ var server = net.createServer(function(socket) {
 	console.log('new client connected');
 
 	socket.on('close', function(had_error) {
-		tcpClients.removeElement(socket);
+		tcpClients.remove(socket);
 		console.log('socket closed ' + (had_error ? 'with error' : ''));
 	});	
 }).listen(9898);

@@ -28,7 +28,7 @@ namespace GitShout
         private ICollection<Action<CommitMessage>> actions = new LinkedList<Action<CommitMessage>>();
         
         public GitShoutClient(string server, int port)
-        {            
+        {
             MessageProcessed += ReadMessageHeader;
             var client = new TcpClient(server, port);
             
@@ -55,13 +55,28 @@ namespace GitShout
 
         private void ReadMessageBody(int messageLength)
         {
+            var readState = new ReadState(messageLength);
             messageBuffer = new byte[messageLength];
-            netStream.BeginRead(messageBuffer, 0, messageBuffer.Length, OnBodyRead, null);
+            netStream.BeginRead(messageBuffer, 0, messageBuffer.Length, OnChunkRead, readState);
         }
 
-        private void OnBodyRead(IAsyncResult result)
+        private void ContinueReadMessageBody(ReadState readState)
         {
-            netStream.EndRead(result);
+            netStream.BeginRead(messageBuffer, readState.Read, readState.Remaining, OnChunkRead, readState);
+        }
+
+        private void OnChunkRead(IAsyncResult result)
+        {
+            var bytesRead = netStream.EndRead(result);
+            var readState = (ReadState)result.AsyncState;
+            readState.Read = bytesRead;
+
+            if (!readState.Finished)
+            {
+                ContinueReadMessageBody(readState);
+                return;
+            }
+            
             ProcessActions();
             MessageProcessed(this, null);
         }
@@ -85,6 +100,19 @@ namespace GitShout
         public void Start()
         {
             Listen();
-        }        
+        }
+
+        private class ReadState 
+        {
+            public ReadState(int messageSize) 
+            {
+                MessageSize = messageSize;
+            }
+
+            public int MessageSize { get; private set; }
+            public int Remaining { get { return MessageSize - Read; } }
+            public int Read { get; set; }
+            public bool Finished { get { return Remaining == 0; } }
+        }
     }
 }
