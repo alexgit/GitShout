@@ -59,6 +59,7 @@
       <DependentUpon>GitShoutTrayApp.cs</DependentUpon>
     </Compile>
     <Compile Include="IMessageFormatter.cs" />
+    <Compile Include="InvalidMessageFormatException.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Start.cs" />
     <EmbeddedResource Include="GitShoutTrayApp.resx">

@@ -24,6 +24,7 @@ namespace GitShout
         private readonly byte[] messageHeader = new byte[4];
         private byte[] messageBuffer;
         private event MessageProcessedEventHandler MessageProcessed;
+        private delegate void MessageProcessedEventHandler(object sender, EventArgs args);
         
         private ICollection<Action<CommitMessage>> actions = new LinkedList<Action<CommitMessage>>();
         
@@ -33,6 +34,11 @@ namespace GitShout
             var client = new TcpClient(server, port);
             
             netStream = client.GetStream();
+        }
+
+        public void Start()
+        {
+            Listen();
         }
 
         private void Listen()
@@ -60,47 +66,51 @@ namespace GitShout
             netStream.BeginRead(messageBuffer, 0, messageBuffer.Length, OnChunkRead, readState);
         }
 
-        private void ContinueReadMessageBody(ReadState readState)
-        {
-            netStream.BeginRead(messageBuffer, readState.Read, readState.Remaining, OnChunkRead, readState);
-        }
-
         private void OnChunkRead(IAsyncResult result)
         {
             var bytesRead = netStream.EndRead(result);
             var readState = (ReadState)result.AsyncState;
-            readState.Read = bytesRead;
+            readState.BytesRead = bytesRead;
 
             if (!readState.Finished)
             {
                 ContinueReadMessageBody(readState);
                 return;
             }
-            
-            ProcessActions();
+
+            RunActions();
             MessageProcessed(this, null);
         }
 
+        private void ContinueReadMessageBody(ReadState readState)
+        {
+            netStream.BeginRead(messageBuffer, readState.BytesRead, readState.BytesRemaining, OnChunkRead, readState);
+        }
+                
         public void OnCommit(Action<CommitMessage> action)
         {
             actions.Add(action);
         }
 
-        private void ProcessActions()
+        private void RunActions()
         {
             var payload = Encoding.UTF8.GetString(messageBuffer);
-            var commitMessage = JsonConvert.DeserializeObject<CommitMessage>(payload);
+
+            CommitMessage commitMessage;
+            try
+            {
+                commitMessage = JsonConvert.DeserializeObject<CommitMessage>(payload);                
+            } 
+            catch(Exception e) 
+            {
+                throw new InvalidMessageFormatException("The message was not a valid JSON string.", payload, e);                
+            }
 
             foreach (var action in actions)
             {
                 action(commitMessage);
             }
-        }
-
-        public void Start()
-        {
-            Listen();
-        }
+        }        
 
         private class ReadState 
         {
@@ -110,9 +120,9 @@ namespace GitShout
             }
 
             public int MessageSize { get; private set; }
-            public int Remaining { get { return MessageSize - Read; } }
-            public int Read { get; set; }
-            public bool Finished { get { return Remaining == 0; } }
+            public int BytesRemaining { get { return MessageSize - BytesRead; } }
+            public int BytesRead { get; set; }
+            public bool Finished { get { return BytesRemaining == 0; } }
         }
     }
 }

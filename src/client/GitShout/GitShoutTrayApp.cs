@@ -29,10 +29,9 @@ namespace GitShout
 
             trayMenu = new ContextMenu();
             trayMenu.MenuItems.Add("Exit", OnExit);
-
+            trayIcon.ContextMenu = trayMenu;
             trayIcon.Text = APP_NAME;
-            trayIcon.BalloonTipClicked += OnBalloonClicked;
-            trayIcon.ContextMenu = trayMenu;            
+            trayIcon.BalloonTipClicked += OpenCommitsInBrowser;                  
         }
 
         private void btnConnect_Click(object sender, EventArgs e)
@@ -60,7 +59,15 @@ namespace GitShout
         {
             gitShoutClient = new GitShoutClient(server, port);
             gitShoutClient.OnCommit(ShowBalloonTip);
-            gitShoutClient.Start();
+
+            try
+            {
+                gitShoutClient.Start();
+            }
+            catch (InvalidMessageFormatException e) 
+            {
+                //TODO: log this
+            }
 
             this.Visible = false;
         }
@@ -80,11 +87,11 @@ namespace GitShout
             trayIcon.ShowBalloonTip(30 * 1000);
         }
 
-        private void OnBalloonClicked(object source, EventArgs eventArgs)
+        private void OpenCommitsInBrowser(object source, EventArgs eventArgs)
         {
             foreach (var url in commitURLs)
             {
-                // This opens the URL using the default browser. See a security hole here? :)
+                // This opens the URL using the default browser. Security hole? :)
                 System.Diagnostics.Process.Start(url);   
             }
         }
@@ -103,7 +110,5 @@ namespace GitShout
                 lblPortNumber.Show();
             }
         }                
-    }
-
-    internal delegate void MessageProcessedEventHandler(object sender, EventArgs args);
+    }    
 }
