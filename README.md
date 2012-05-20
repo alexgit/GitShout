@@ -1,6 +1,6 @@
 =======
 # GitShout
-A node.js server + windows tray app that notifys you of commits to your github repositories
+A node.js server + windows tray app that notifies you of commits to your github repositories
 
 GitShout is a simple notification app built on Node.js that allows you to stay on top of commits to your GitHub repository.
 
