@@ -9,9 +9,10 @@ Array.prototype.remove = function(element) {
 		if (this[i] === element) {
 			this.splice(i,1);
 			return true;
-		}
-		return false;
+		}	
 	}
+	
+	return false;	
 }
 
 http.createServer(function (request, response) { 
