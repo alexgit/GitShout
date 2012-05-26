@@ -2,7 +2,7 @@ var net = require('net');
 var http = require('http');
 var fs = require('fs');
 var querystring = require('querystring');
-var sys = require('sys');
+var sys = require('util');
 
 Array.prototype.remove = function(element) {
 	for(var i = 0; i < this.length; i++) {
@@ -66,7 +66,7 @@ function sendframe(stream, message) {
 	var length = Buffer.byteLength(message, 'utf8')
 	var buffer = new Buffer(length + 4);
 		
-	buffer.writeInt32(length, 0, 'little');
+	buffer.writeInt32LE(length, 0);
 	buffer.write(message, 4);
 	stream.write(buffer);
 		
