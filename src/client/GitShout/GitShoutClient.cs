@@ -12,11 +12,14 @@ namespace GitShout
     using System;
     using System.Collections.Generic;
     using System.Text;
-
+    using log4net;
+    
     public class GitShoutClient
     {
         private readonly NetworkStream netStream;
-        
+
+        private static ILog logger = LogManager.GetLogger(typeof(GitShoutClient));
+
         /// <summary>
         /// The message header contains the length of the message that follows it.
         /// The the 4 byte array contains a little endian integer representation of the length.
@@ -37,8 +40,8 @@ namespace GitShout
         }
 
         public void Start()
-        {
-            Listen();
+        {            
+            Listen();            
         }
 
         private void Listen()
@@ -48,14 +51,21 @@ namespace GitShout
 
         private void ReadMessageHeader(object source, EventArgs args)
         {
-            netStream.BeginRead(messageHeader, 0, messageHeader.Length, OnMessageHeaderRead, null);
+            netStream.BeginRead(messageHeader, 0, messageHeader.Length, HandleHeaderChunkRead, null);
         }
 
-        private void OnMessageHeaderRead(IAsyncResult result)
+        private void HandleHeaderChunkRead(IAsyncResult result)
         {
-            netStream.EndRead(result);
-            var messageLength = BitConverter.ToInt32(messageHeader, 0);
+            var bytesRead = netStream.EndRead(result);
 
+            if(bytesRead != 0) 
+            {
+                netStream.BeginRead(messageHeader, bytesRead, messageHeader.Length - bytesRead, HandleHeaderChunkRead, null);
+                return;
+            }
+
+            var messageLength = BitConverter.ToInt32(messageHeader, 0);
+                        
             ReadMessageBody(messageLength);
         }
 
@@ -63,28 +73,30 @@ namespace GitShout
         {
             var readState = new ReadState(messageLength);
             messageBuffer = new byte[messageLength];
-            netStream.BeginRead(messageBuffer, 0, messageBuffer.Length, OnChunkRead, readState);
+            netStream.BeginRead(messageBuffer, 0, messageBuffer.Length, HandleBodyChunkRead, readState);            
         }
 
-        private void OnChunkRead(IAsyncResult result)
+        private void HandleBodyChunkRead(IAsyncResult result)
         {
             var bytesRead = netStream.EndRead(result);
             var readState = (ReadState)result.AsyncState;
-            readState.BytesRead = bytesRead;
+            readState.IncrementBytesRead(bytesRead);
 
-            if (!readState.Finished)
+            if (readState.Finished)
             {
-                ContinueReadMessageBody(readState);
+                RunActions();
+                MessageProcessed(this, args: null);
                 return;
             }
-
-            RunActions();
-            MessageProcessed(this, null);
+            else
+            {
+                ContinueReadMessageBody(readState);
+            }            
         }
 
         private void ContinueReadMessageBody(ReadState readState)
         {
-            netStream.BeginRead(messageBuffer, readState.BytesRead, readState.BytesRemaining, OnChunkRead, readState);
+            netStream.BeginRead(messageBuffer, readState.BytesRead, readState.BytesRemaining, HandleBodyChunkRead, readState);
         }
                 
         public void OnCommit(Action<CommitMessage> action)
@@ -94,7 +106,7 @@ namespace GitShout
 
         private void RunActions()
         {
-            var payload = Encoding.UTF8.GetString(messageBuffer);
+            var payload = Encoding.UTF8.GetString(messageBuffer);                       
 
             CommitMessage commitMessage;
             try
@@ -121,8 +133,16 @@ namespace GitShout
 
             public int MessageSize { get; private set; }
             public int BytesRemaining { get { return MessageSize - BytesRead; } }
-            public int BytesRead { get; set; }
+            public int BytesRead { get; private set; }
             public bool Finished { get { return BytesRemaining == 0; } }
+
+            public void IncrementBytesRead(int numberOfBytes) 
+            {
+                if (numberOfBytes < 0)
+                    throw new ArgumentException("the number of bytes read cannot be negative");
+
+                BytesRead += numberOfBytes;
+            }
         }
     }
 }
