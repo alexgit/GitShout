@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
+using log4net.Config;
 
 namespace GitShout
 {
@@ -13,6 +14,8 @@ namespace GitShout
         [STAThread]
         static void Main()
         {
+            XmlConfigurator.Configure();
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new GitShoutTrayApp(new DefaultMessageFormatter()));
